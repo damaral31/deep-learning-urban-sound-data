@@ -1,0 +1,54 @@
+name: urban-sound-dl
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python
+  - python=3.10
+  
+  # Core PyTorch packages (from pytorch channel)
+  # Removido 'pytorch-cuda=12.1' e ajustado 'pytorch' para garantir a compatibilidade com o Windows e resolver o erro 'cuda-nvtx'.
+  # O conda irá agora selecionar a versão CUDA compatível ou a versão apenas para CPU, dependendo da configuração.
+  - pytorch
+  - torchvision
+  - torchaudio
+  
+  # Deep Learning & ML
+  - numpy
+  - scipy
+  - scikit-learn
+  - pandas
+  - matplotlib
+  - seaborn
+  
+  # Audio Processing
+  - librosa
+  - resampy
+  
+  # Utilities
+  - jupyter
+  - jupyterlab
+  - ipython
+  - tqdm
+  - pyyaml
+  - requests
+  - pillow
+  
+  # Development
+  - git
+  - pip
+  - setuptools
+  - wheel
+  
+  # Pacotes Pip (para pacotes não disponíveis no conda)
+  - pip: # Sintaxe corrigida: a lista de pacotes pip deve ser aninhada sob '- pip:'
+    - torch-summary
+    - torchmetrics
+    - tensorboard
+    - wandb
+    - optuna
+    - soundfile
+    - audiomentations
+    - albumentations
