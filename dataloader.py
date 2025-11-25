@@ -13,6 +13,7 @@ class Dataloader():
         self.verbose = verbose
         self.dataset = soundata.initialize("urbansound8k", data_home=dataset_path)
         self.all_clips = self.dataset.load_clips()
+        self.clip_ids = list(self.all_clips.keys())
         
         if preprocessing == None:
             self.preprocessing = self.no_preprocessing
@@ -44,7 +45,8 @@ class Dataloader():
     
     def __getitem__(self, i):
         
-        clip = list(self.all_clips.values())[i]
+        clip_id = self.clip_ids[i]
+        clip = self.all_clips[clip_id]
         treated_clip = self.preprocessing(clip)
         
         if self.verbose:
