@@ -1,28 +1,44 @@
 import soundata
 from soundata.core import Clip
 import numpy
+from pathlib import Path
 import os
 from typing import Callable
 import time
 from preprocessing import AudioPreprocessor
+import config
 
 class Dataloader():
     
-    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None, verbose : bool = False):
-        self.dataset_path = dataset_path
+    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None, verbose : bool = False, include_augmented : bool = False):
+        self.dataset_path : Path = Path(dataset_path) / "urbansound8K"
         self.preprocessing = preprocessing
         self.verbose = verbose
-        self.dataset = soundata.initialize("urbansound8k", data_home=dataset_path)
+        self.include_augmented = include_augmented
+        self.dataset = soundata.initialize("urbansound8k", data_home=self.dataset_path)
         self.all_clips = self.dataset.load_clips()
+        self.n_original_clips = len(self.all_clips)
         self.clip_ids = list(self.all_clips.keys())
+        
+        if include_augmented:
+            self.augmented_path = config.PROJECT_ROOT / "datasets" / "augmentation"
+            self.n_augmented_clips = 0
             
+            for root, dirs, files in os.walk(self.augmented_path):
+                for f in files:
+                    if f.endswith('.npy'):
+                        self.n_augmented_clips += 1
+        
         if self.verbose: print(f"Dataset loaded with {len(self)} clips\n")
     
     def no_preprocessing(self, clip : Clip): # recebe um objeto soudata.core.Clip
         return clip
     
     def __len__(self):
-        return len(self.all_clips)
+        if self.include_augmented:
+            return self.n_original_clips + self.n_augmented_clips
+        else:
+            return self.n_original_clips
 
     def get_label_mapping(self):
         class_mapping = {
@@ -61,31 +77,7 @@ class Dataloader():
     
 
 if __name__ == "__main__":
-    import csv
-    from collections import Counter
-    
-    dl = Dataloader(r"C:\Users\diogo\OneDrive\Documents", verbose=False)
-    
-    # Contar classes
-    class_counts = Counter()
-    for i in range(len(dl)):
-        _, class_id = dl[i]
-        class_counts[class_id] += 1
-    
-    # Calcular percentagens
-    total = len(dl)
-    label_mapping = dl.get_label_mapping()
-    
-    # Guardar em CSV
-    with open('class_distribution.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['class_id', 'class_name', 'count', 'proportion'])
-        
-        for class_id in sorted(class_counts.keys()):
-            count = class_counts[class_id]
-            proportion = count / total
-            class_name = label_mapping[class_id]
-            writer.writerow([class_id, class_name, count, f"{proportion:.4f}"])
-            print(f"Class {class_id} ({class_name}): {count} samples ({proportion:.4f})")
-    
-    print(f"\n[DONE] Class distribution saved to class_distribution.csv")
+    dl = Dataloader(dataset_path=r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets",
+                    verbose=True, include_augmented=True)
+    l = len(dl)
+    print(f"Length of dataloader: {l}\n")
