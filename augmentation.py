@@ -104,6 +104,10 @@ def apply_augmentation(sound, augmentation_needs):
     out_dir = os.path.join(AUGMENTATION_DIR, f"fold{sound.fold}")
     os.makedirs(out_dir, exist_ok=True)
 
+    # Augmentação extra para balanceamento
+    class_id = sound.class_id
+    extras_needed = augmentation_needs.get(class_id, 0)
+
     # Gerar arquivos aumentados básicos
     for aug_name, aug_y in augmentations.items():
         # Mudar extensão de .wav para .npy
@@ -112,12 +116,10 @@ def apply_augmentation(sound, augmentation_needs):
         out_path = os.path.join(out_dir, filename)
         
         # Guardar como objeto Python (tupla) usando allow_pickle
-        np.save(out_path, np.array((aug_y, sr), dtype=object))
+        np.save(out_path, np.array((aug_y, class_id, sr), dtype=object))
         print(f"[OK] Saved {out_path}")
     
-    # Augmentação extra para balanceamento
-    class_id = sound.class_id
-    extras_needed = augmentation_needs.get(class_id, 0)
+    
     
     if extras_needed > 0:
         for i in range(extras_needed):
@@ -129,7 +131,7 @@ def apply_augmentation(sound, augmentation_needs):
             filename = f"extra_noise_{i}_{base_name}.npy"
             out_path = os.path.join(out_dir, filename)
             
-            np.save(out_path, np.array((aug_y, sr), dtype=object))
+            np.save(out_path, np.array((aug_y, class_id, sr), dtype=object))
             print(f"[OK] Saved extra {out_path}")
 
 
