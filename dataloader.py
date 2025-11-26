@@ -4,25 +4,21 @@ import numpy
 import os
 from typing import Callable
 import time
+from preprocessing import AudioPreprocessor
 
 class Dataloader():
     
-    def __init__(self, dataset_path : str, preprocessing : Callable = None, verbose : bool = False):
+    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None, verbose : bool = False):
         self.dataset_path = dataset_path
         self.preprocessing = preprocessing
         self.verbose = verbose
         self.dataset = soundata.initialize("urbansound8k", data_home=dataset_path)
         self.all_clips = self.dataset.load_clips()
         self.clip_ids = list(self.all_clips.keys())
-        
-        if preprocessing == None:
-            self.preprocessing = self.no_preprocessing
-        else:
-            self.preprocessing = preprocessing
             
         if self.verbose: print(f"Dataset loaded with {len(self)} clips\n")
     
-    def no_preprocessing(self, clip : soundata.core.Clip): # recebe um objeto soudata.core.Clip
+    def no_preprocessing(self, clip : Clip): # recebe um objeto soudata.core.Clip
         return clip
     
     def __len__(self):
@@ -46,19 +42,22 @@ class Dataloader():
     def __getitem__(self, i):
         
         clip_id = self.clip_ids[i]
-        clip = self.all_clips[clip_id]
-        treated_clip = self.preprocessing(clip)
+        clip : Clip = self.all_clips[clip_id]
+        
+        if self.preprocessing is not None:
+            treated_audio = self.preprocessing.process_clip(clip)
+        else:  treated_audio = self.no_preprocessing(clip)
         
         if self.verbose:
             print(f"Item of index {i}")
-            print(f"Clip ID: {treated_clip.clip_id}")
-            print(f"Fold: {treated_clip.fold}")
-            print(f"Class ID: {treated_clip.class_id}")
-            print(f"Class Label: {treated_clip.class_label}")
-            print(f"Salience: {treated_clip.salience}")
+            print(f"Clip ID: {clip.clip_id}")
+            print(f"Fold: {clip.fold}")
+            print(f"Class ID: {clip.class_id}")
+            print(f"Class Label: {clip.class_label}")
+            print(f"Salience: {clip.salience}")
             print("="*30)
         
-        return treated_clip, clip.class_id # retorna um int q esta mapeado para um label
+        return treated_audio, clip.class_id # retorna um int q esta mapeado para um label
     
 
 if __name__ == "__main__":

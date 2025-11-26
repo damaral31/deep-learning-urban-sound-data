@@ -26,6 +26,7 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 MODELS_DIR = RESULTS_DIR / "models"
 LOGS_DIR = RESULTS_DIR / "logs"
 PLOTS_DIR = RESULTS_DIR / "plots"
+PROCESSED_AUDIOS_DIR = PROJECT_ROOT / "processed_audios"
 
 # Caminho alternativo (se dataset estiver em outro local)
 DATASET_PATH = 'C:\\Users\\diogo\\OneDrive\\Documents\\UrbanSound8K\\UrbanSound8K\\audio'
@@ -43,6 +44,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ============================================================================
 # DATASET - Urban Sound 8K
 # ============================================================================
+
+NORMALIZED_AUDIO_LENGTH = 4  # segundos
 
 DATASET = {
     'name': 'UrbanSound8K',
