@@ -61,12 +61,31 @@ class Dataloader():
     
 
 if __name__ == "__main__":
-    start = time.perf_counter()
-    dl = Dataloader(r"C:\Users\migue\Documents\MyCode\AC2\urbansound8k", verbose=True)
-
-
+    import csv
+    from collections import Counter
+    
+    dl = Dataloader(r"C:\Users\diogo\OneDrive\Documents", verbose=False)
+    
+    # Contar classes
+    class_counts = Counter()
     for i in range(len(dl)):
-        _ = dl[i][0].audio # quando o preprocessing tiver feito tira se o .audio
-
-    elapsed = time.perf_counter() - start
-    print(f"Total elapsed time: {elapsed:.3f} seconds")
+        _, class_id = dl[i]
+        class_counts[class_id] += 1
+    
+    # Calcular percentagens
+    total = len(dl)
+    label_mapping = dl.get_label_mapping()
+    
+    # Guardar em CSV
+    with open('class_distribution.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['class_id', 'class_name', 'count', 'proportion'])
+        
+        for class_id in sorted(class_counts.keys()):
+            count = class_counts[class_id]
+            proportion = count / total
+            class_name = label_mapping[class_id]
+            writer.writerow([class_id, class_name, count, f"{proportion:.4f}"])
+            print(f"Class {class_id} ({class_name}): {count} samples ({proportion:.4f})")
+    
+    print(f"\n[DONE] Class distribution saved to class_distribution.csv")
