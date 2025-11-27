@@ -1,6 +1,6 @@
 import soundata
 from soundata.core import Clip
-import numpy
+import numpy as np
 from pathlib import Path
 import os
 from typing import Callable
@@ -28,11 +28,27 @@ class Dataloader():
                 for f in files:
                     if f.endswith('.npy'):
                         self.n_augmented_clips += 1
+                        
+            self.n_augmented_clips_per_partition = self.get_augmented_clips_per_partition()
         
         if self.verbose: print(f"Dataset loaded with {len(self)} clips\n")
     
-    def no_preprocessing(self, clip : Clip): # recebe um objeto soudata.core.Clip
-        return clip
+    def get_augmented_clips_per_partition(self):
+        augmented_counts = {}
+        cumulative_count = 0
+        
+        for fold_num in range(1, 11):
+            fold_dir = self.augmented_path / f"fold{fold_num}"
+            if fold_dir.exists():
+                count = sum(1 for f in fold_dir.iterdir() if f.suffix == '.npy')
+                cumulative_count += count
+            
+            augmented_counts[fold_num] = cumulative_count
+            
+        return augmented_counts
+    
+    def no_preprocessing(self, audio : np.ndarray, sample_rate : int):
+        return audio
     
     def __len__(self):
         if self.include_augmented:
@@ -57,12 +73,36 @@ class Dataloader():
     
     def __getitem__(self, i):
         
-        clip_id = self.clip_ids[i]
-        clip : Clip = self.all_clips[clip_id]
+        if i in range(0, self.n_original_clips):
+            clip_id = self.clip_ids[i]
+            clip : Clip = self.all_clips[clip_id]
+            audio, sample_rate = clip.audio
+            label = clip.class_id
+        elif self.include_augmented and i in range(self.n_original_clips, len(self)):
+            augmented_index = i - self.n_original_clips
+            fold_num = 1
+            for fold, cumulative_count in self.n_augmented_clips_per_partition.items():
+                if augmented_index < cumulative_count:
+                    fold_num = fold
+                    break
+            
+            fold_dir = self.augmented_path / f"fold{fold_num}"
+            previous_cumulative = 0 if fold_num == 1 else self.n_augmented_clips_per_partition[fold_num - 1]
+            index_in_fold = augmented_index - previous_cumulative
+            
+            augmented_files = [f for f in fold_dir.iterdir() if f.suffix == '.npy']
+            augmented_files.sort()
+            
+            augmented_file = augmented_files[index_in_fold]
+            data = np.load(augmented_file, allow_pickle=True).item()
+            
+            audio = data[0]
+            sample_rate = data[1]
+            label = data[2]
         
         if self.preprocessing is not None:
-            treated_audio = self.preprocessing.process_clip(clip)
-        else:  treated_audio = self.no_preprocessing(clip)
+            treated_audio = self.preprocessing.process_clip(audio, sample_rate)
+        else:  treated_audio = self.no_preprocessing(audio, sample_rate)
         
         if self.verbose:
             print(f"Item of index {i}")
@@ -73,8 +113,8 @@ class Dataloader():
             print(f"Salience: {clip.salience}")
             print("="*30)
         
-        return treated_audio, clip.class_id # retorna um int q esta mapeado para um label
-    
+        return treated_audio, label # retorna um int q esta mapeado para um label
+
 
 if __name__ == "__main__":
     dl = Dataloader(dataset_path=r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets",
