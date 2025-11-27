@@ -134,7 +134,6 @@ class Train:
             self.val_fold = folds[(test_idx + 1) % len(folds)]
             self.train_folds = [f for f in folds if f != self.test_fold and f != self.val_fold]
             
-            
             print(f"\n=== Test = {self.test_fold}, Validation = {self.val_fold}, Train folds = {self.train_folds} ===")
 
             fold_history = {
@@ -351,7 +350,7 @@ from models.CNN import SoundCNN
 
 import os
 
-FOLDS = [f"fold{i}" for i in range(1, 11)]
+FOLDS = ["fold1"]
 DATA_PATH = "datasets/augmentation"
 
 # Pass an already instantiated model
