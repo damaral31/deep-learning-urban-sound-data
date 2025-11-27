@@ -55,7 +55,7 @@ class Dataloader():
         }
         return class_mapping
     
-    def plot_waveform(self, audio : np.ndarray, sample_rate : int):
+    def plot_waveform(self, audio : np.ndarray):
         
         plt.figure(figsize=(10, 4))
         plt.plot(audio)
