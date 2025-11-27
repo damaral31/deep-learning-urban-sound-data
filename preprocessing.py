@@ -71,6 +71,29 @@ class AudioPreprocessor:
         features = self.extract_features(audio)
         return features
 
+    
+    def plot_all_channels(self, features : np.ndarray, fold : int = None, label : str = None):
+        
+        title = "Audio Features"
+        
+        if fold is not None and label is not None:
+            title += f" (Label: {label}, Fold: {fold})"
+        elif fold is not None:
+            title += f" (Fold: {fold})"
+        elif label is not None:
+            title += f" (Label: {label})"
+        
+        titles = ['Log Mel Spectrogram', 'Delta', 'Delta-Delta', 'Harmonic', 'Percussive']
+        fig, axes = plt.subplots(5, 1, figsize=(10, 15))
+        fig.suptitle(title)
+        
+        for i, ax in enumerate(axes):
+            img = librosa.display.specshow(features[i], x_axis='time', y_axis='mel', sr=self.sample_rate, ax=ax)
+            ax.set_title(titles[i])
+            fig.colorbar(img, ax=ax, format='%+2.0f dB')
+            
+        plt.tight_layout()
+        plt.show()
 
 if __name__ == "__main__":
     import soundata
@@ -79,7 +102,7 @@ if __name__ == "__main__":
     preprocessor = AudioPreprocessor()
     
     # Initialize dataset directly without Dataloader
-    dataset_path = r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets\urbansound8K"
+    dataset_path = r"E:\deep-learning-urban-sound-data\datasets\urbansound8k"
     dataset = soundata.initialize("urbansound8k", data_home=dataset_path)
     
     # Get all clips
@@ -100,16 +123,6 @@ if __name__ == "__main__":
         
         print(f"Features shape: {features.shape}")
         
-        # Plot all channels
-        fig, axes = plt.subplots(5, 1, figsize=(10, 15))
-        titles = ['Log Mel Spectrogram', 'Delta', 'Delta-Delta', 'Harmonic', 'Percussive']
-        
-        for i, ax in enumerate(axes):
-            img = librosa.display.specshow(features[i], x_axis='time', y_axis='mel', sr=preprocessor.sample_rate, ax=ax)
-            ax.set_title(titles[i])
-            fig.colorbar(img, ax=ax, format='%+2.0f dB')
-            
-        plt.tight_layout()
-        plt.show()
+        preprocessor.plot_all_channels(features, 1, "gun_shot")
     else:
         print("No gun_shot clips found.")

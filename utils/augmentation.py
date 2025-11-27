@@ -176,7 +176,7 @@ if __name__ == "__main__":
     print("Iniciando augmentação...")
     print("="*60 + "\n")
     
-    dl = Dataloader(r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets", verbose=False)
+    dl = Dataloader(r"E:\deep-learning-urban-sound-data\datasets", verbose=False)
     
     all_files_metadata = []
     l = len(dl)
