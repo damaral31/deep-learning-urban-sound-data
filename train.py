@@ -132,9 +132,8 @@ class Train:
             self.model.load_state_dict(copy.deepcopy(initial_model_state))
 
             self.val_fold = folds[(test_idx + 1) % len(folds)]
-            self.train_folds = [f for f in folds if f != self.test_fold and f != self.val_fold]
-            
-            print(f"\n=== Test = {self.test_fold}, Validation = {self.val_fold}, Train folds = {self.train_folds} ===")
+            self.train_folds = [f for f in folds if f != self.test_fold or f != self.val_fold]
+            print(f"\n=== Test = {self.test_fold}, Validation = {self.val_fold} ===")
 
             fold_history = {
                 'train_acc': [], 
