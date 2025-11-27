@@ -22,6 +22,7 @@ PROJECT_ROOT = Path(__file__).parent.absolute()
 
 # Diretórios
 DATA_DIR = PROJECT_ROOT / "datasets" / "UrbanSound8K"
+AUGMENTATION_DIR = PROJECT_ROOT / "datasets" / "augmentation"
 RESULTS_DIR = PROJECT_ROOT / "results"
 MODELS_DIR = RESULTS_DIR / "models"
 LOGS_DIR = RESULTS_DIR / "logs"

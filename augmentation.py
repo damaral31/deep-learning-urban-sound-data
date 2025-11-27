@@ -4,6 +4,7 @@ import librosa
 from scipy.signal import butter, lfilter
 import csv
 import pandas as pd
+import json
 
 
 DATA_ROOT = "datasets"
@@ -14,7 +15,9 @@ os.makedirs(AUGMENTATION_DIR, exist_ok=True)
 METADATA_CSV = os.path.join(AUGMENTATION_DIR, "augmented_metadata.csv")
 
 # Carregar distribuição de classes
-CLASS_DISTRIBUTION = pd.read_csv("class_distribution.csv")
+script_dir = os.path.dirname(os.path.abspath(__file__))
+class_distribution_path = os.path.join(script_dir, "class_distribution.csv")
+CLASS_DISTRIBUTION = pd.read_csv(class_distribution_path)
 
 
 # ============================================================
@@ -108,6 +111,8 @@ def apply_augmentation(sound, augmentation_needs):
     class_id = sound.class_id
     extras_needed = augmentation_needs.get(class_id, 0)
 
+    generated_files = []
+
     # Gerar arquivos aumentados básicos
     for aug_name, aug_y in augmentations.items():
         # Mudar extensão de .wav para .npy
@@ -118,6 +123,12 @@ def apply_augmentation(sound, augmentation_needs):
         # Guardar como objeto Python (tupla) usando allow_pickle
         np.save(out_path, np.array((aug_y, sr, class_id), dtype=object))
         print(f"[OK] Saved {out_path}")
+        
+        generated_files.append({
+            "filename": filename,
+            "fold": sound.fold,
+            "path": out_path
+        })
     
     
     
@@ -133,9 +144,21 @@ def apply_augmentation(sound, augmentation_needs):
             
             np.save(out_path, np.array((aug_y, sr, class_id), dtype=object))
             print(f"[OK] Saved extra {out_path}")
+            
+            generated_files.append({
+                "filename": filename,
+                "fold": sound.fold,
+                "path": out_path
+            })
+            
+    return generated_files
 
 
 if __name__ == "__main__":
+    import sys
+    # Add project root to sys.path to import dataloader
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
     from dataloader import Dataloader
     import config as cfg
     
@@ -153,16 +176,24 @@ if __name__ == "__main__":
     print("Iniciando augmentação...")
     print("="*60 + "\n")
     
-    dl = Dataloader(r"C:\\Users\\diogo\\OneDrive\\Documents", verbose=False)
+    dl = Dataloader(r"E:\deep-learning-urban-sound-data\datasets", verbose=False)
     
+    all_files_metadata = []
     l = len(dl)
     for i in range(l):
         clip_id = dl.clip_ids[i]
         sound = dl.all_clips[clip_id]
         
         print(f"\n[{i+1}/{l}] Processando {sound.slice_file_name} (classe {sound.class_id})...")
-        apply_augmentation(sound, augmentation_needs)
+        files = apply_augmentation(sound, augmentation_needs)
+        all_files_metadata.extend(files)
     
+    # Save JSON index
+    json_path = os.path.join(AUGMENTATION_DIR, "augmented_files_index.json")
+    with open(json_path, 'w') as f:
+        json.dump(all_files_metadata, f, indent=4)
+    print(f"\n✓ Index JSON saved to '{json_path}'")
+
     print("\n" + "="*60)
     print("Augmentação completa!")
     print("="*60)
@@ -199,7 +230,7 @@ if __name__ == "__main__":
     
     # Guardar CSV
     new_df = pd.DataFrame(new_distribution)
-    output_csv = "augmented_class_distribution.csv"
+    output_csv = os.path.join(script_dir, "augmented_class_distribution.csv")
     new_df.to_csv(output_csv, index=False)
     
     print(f"\n✓ Nova distribuição guardada em '{output_csv}'")
