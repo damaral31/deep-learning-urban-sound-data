@@ -117,7 +117,7 @@ class Dataloader():
 
 
 if __name__ == "__main__":
-    dl = Dataloader(dataset_path=r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets",
+    dl = Dataloader(dataset_path=r"C:\\Users\\diogo\\OneDrive\\Documents",
                     verbose=True, include_augmented=True)
     l = len(dl)
     print(f"Length of dataloader: {l}\n")
