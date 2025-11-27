@@ -34,7 +34,6 @@ class Train:
         self.patience = patience
         self.early_stopping = True if patience > 0 else False
         
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.regularization = 1e-4  # L2 regularization strength
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=self.regularization)
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -61,43 +60,60 @@ class Train:
 
         
     def epoch(self, dataloader):
+        from tqdm import tqdm
+        
         self.model.to(self.device)
         self.model.train()
         running_loss, correct, total = 0.0, 0, 0
-        for batch_idx, (inputs, labels) in enumerate(dataloader):
-            print(f"Batch {batch_idx}: inputs.shape={inputs.shape}, labels.shape={labels.shape}")
+        
+        progress_bar = tqdm(dataloader, desc="Training", leave=True)
+        for batch_idx, (inputs, labels) in enumerate(progress_bar):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
-            print(f"Batch {batch_idx}: outputs.shape={outputs.shape}")
             loss = self.criterion(outputs, labels)
-            print(f"Batch {batch_idx}: loss={loss.item()}")
             loss.backward()
             self.optimizer.step()
             running_loss += loss.item() * inputs.size(0)
             _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
             correct += (predicted == labels).sum().item()
-        avg_loss = running_loss / total
-        accuracy = correct / total
+            total += labels.size(0)
+            
+            # Atualizar barra de progresso
+            current_acc = correct / total if total > 0 else 0.0
+            current_loss = running_loss / total if total > 0 else 0.0
+            progress_bar.set_postfix({'loss': f'{current_loss:.4f}', 'acc': f'{current_acc:.4f}'})
+            
+        avg_loss = running_loss / total if total > 0 else 0.0
+        accuracy = correct / total if total > 0 else 0.0
         return avg_loss, accuracy
 
 
     def validate(self, dataloader):
+        from tqdm import tqdm
+        
         self.model.to(self.device)
         self.model.eval()
         running_loss, correct, total = 0.0, 0, 0
+        
+        progress_bar = tqdm(dataloader, desc="Validating", leave=True)
         with torch.no_grad():
-            for inputs, labels in dataloader:
+            for inputs, labels in progress_bar:
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, labels)
                 running_loss += loss.item() * inputs.size(0)
                 _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-        avg_loss = running_loss / total
-        accuracy = correct / total
+                total += labels.size(0)
+                
+                # Atualizar barra de progresso
+                current_acc = correct / total if total > 0 else 0.0
+                current_loss = running_loss / total if total > 0 else 0.0
+                progress_bar.set_postfix({'loss': f'{current_loss:.4f}', 'acc': f'{current_acc:.4f}'})
+                
+        avg_loss = running_loss / total if total > 0 else 0.0
+        accuracy = correct / total if total > 0 else 0.0
         return avg_loss, accuracy
 
     def run(self, folds):
@@ -113,18 +129,19 @@ class Train:
 
         for test_idx, self.test_fold in enumerate(folds):
             # Reset do modelo para o estado inicial
-            self.model.load_state_dict(initial_model_state)
+            self.model.load_state_dict(copy.deepcopy(initial_model_state))
 
             self.val_fold = folds[(test_idx + 1) % len(folds)]
-            self.train_folds = [f for f in folds if f != self.test_fold or f != self.val_fold]
-            print(f"\n=== Test = {self.test_fold}, Validation = {self.val_fold} ===")
+            self.train_folds = [f for f in folds if f != self.test_fold and f != self.val_fold]
+            
+            
+            print(f"\n=== Test = {self.test_fold}, Validation = {self.val_fold}, Train folds = {self.train_folds} ===")
 
             fold_history = {
                 'train_acc': [], 
                 'train_loss': [],
                 'val_acc': [], 
-                'val_loss': [],
-                'test_acc': []
+                'val_loss': []
                 }
 
             best_model_wts = None
@@ -139,8 +156,8 @@ class Train:
 
             for epoch in range(1, self.epochs+1):
                 print(f"\n--- Epoch {epoch}/{self.epochs} ---")
-                training_acc, training_loss = self.epoch(train_loader)
-                val_acc, val_loss = self.validate(val_loader)
+                training_loss, training_acc = self.epoch(train_loader)
+                val_loss, val_acc = self.validate(val_loader)
                 fold_history['train_acc'].append(training_acc)
                 fold_history['train_loss'].append(training_loss)
                 fold_history['val_acc'].append(val_acc)
@@ -150,7 +167,7 @@ class Train:
                     if val_loss < best_val_loss:
                         best_val_loss = val_loss
                         epochs_no_improve = 0
-                        best_model_wts = self.model.state_dict()
+                        best_model_wts = copy.deepcopy(self.model.state_dict())
                     else:
                         epochs_no_improve += 1
                         if epochs_no_improve >= self.patience:
@@ -159,59 +176,97 @@ class Train:
 
                 print(f"Train Loss: {training_loss:.4f}, Train Acc: {training_acc:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
 
+            # Calcular métricas no test set
+            if best_model_wts is not None:
+                metrics = self.test_models(best_model_wts, test_loader, self.test_fold)
+            else:
+                print("Aviso: Nenhum melhor modelo foi salvo.")
+                metrics = {}
+
+            # Guardar histórico e métricas
             history_per_fold[self.test_fold] = fold_history 
+            metrics_per_fold[self.test_fold] = metrics
 
             self.plot_history(fold_history)
-            self.test_models(best_model_wts, self.model.state_dict(), test_loader) 
-            self.save_json_metrics(history_per_fold, metrics_per_fold, save_path=os.path.join(self.save_dir, self.name, self.test_fold))
+            
+            # Guardar resultados específicos deste fold
+            fold_save_path = os.path.join(self.save_dir, self.name, self.test_fold)
+            self.save_fold_results(fold_history, metrics, fold_save_path)
 
-        self.save_json_metrics(history_per_fold, metrics_per_fold, save_path=os.path.join(self.save_dir, self.name, save_path=os.path.join(self.save_dir, self.name)))
+        # Guardar resumo geral de todos os folds
+        self.save_json_metrics(history_per_fold, metrics_per_fold, save_path=os.path.join(self.save_dir, self.name, "overall"))
 
-    def test_models(self, best_model_wts, current_model_wts, dataloader, show=False):
+    def test_models(self, best_model_wts, dataloader, test_fold_name, show=False):
         import matplotlib.pyplot as plt
+        from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
+        from tqdm import tqdm
+        import numpy as np
 
-        for model_name, model_wts in [("best", best_model_wts), ("current", current_model_wts)]:
-            self.model.load_state_dict(model_wts)
-            self.model.to(self.device)
-            self.model.eval()
+        self.model.load_state_dict(best_model_wts)
+        self.model.to(self.device)
+        self.model.eval()
 
+        correct = 0
+        total = 0
+        all_preds = []
+        all_labels = []
 
-            correct = 0
-            total = 0
-            all_preds = []
-            all_labels = []
+        progress_bar = tqdm(dataloader, desc="Testing", leave=True)
+        with torch.no_grad():
+            for inputs, labels in progress_bar:
+                inputs = inputs.to(self.device)
+                labels = labels.to(self.device)
+                outputs = self.model(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                all_preds.extend(predicted.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+                
+                # Atualizar barra de progresso
+                current_acc = correct / total if total > 0 else 0.0
+                progress_bar.set_postfix({'acc': f'{current_acc:.4f}'})
 
-            with torch.no_grad():
-                for inputs, labels in dataloader:
-                    inputs = inputs.to(self.device)
-                    labels = labels.to(self.device)
-                    outputs = self.model(inputs)
-                    _, predicted = torch.max(outputs.data, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-                    all_preds.extend(predicted.cpu().numpy())
-                    all_labels.extend(labels.cpu().numpy())
+        accuracy = correct / total if total > 0 else 0.0
+        print(f"Test Accuracy on fold {test_fold_name}: {accuracy:.4f}")
 
-            accuracy = 100 * correct / total if total > 0 else 0.0
-            print(f"Test Accuracy of the {model_name} model on fold {self.test_fold}: {accuracy:.2f}%")
+        # Confusion Matrix
+        if all_labels and all_preds:
+            cm = confusion_matrix(all_labels, all_preds)
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+            disp.plot(cmap=plt.cm.Blues)
+            plt.title(f"Confusion Matrix - {test_fold_name}")
 
-            # Confusion Matrix
-            if all_labels and all_preds:
-                cm = confusion_matrix(all_labels, all_preds)
-                disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-                disp.plot(cmap=plt.cm.Blues)
-                plt.title(f"Confusion Matrix - {self.test_fold} ({model_name})")
+            save_path = os.path.join(self.save_dir, self.name, test_fold_name)
+            os.makedirs(save_path, exist_ok=True)
 
-                save_path = os.path.join(self.save_dir, self.name, self.test_fold)
-                os.makedirs(save_path, exist_ok=True)
+            plt.savefig(os.path.join(save_path, "confusion_matrix.png"))
+            if show:
+                plt.show()
+            plt.close()
+            print(f"Confusion matrix saved to {save_path}")
+        else:
+            print("No predictions or labels to plot confusion matrix.")
 
-                plt.savefig(os.path.join(save_path, f"confusion_matrix_{model_name}.png"))
-                if show:
-                    plt.show()
-                plt.close()
-                print(f"Confusion matrix saved to {save_path}")
-            else:
-                print("No predictions or labels to plot confusion matrix.")
+        # Métricas adicionais
+        accuracy_per_class = (cm.diagonal() / cm.sum(axis=1)).tolist() if total > 0 and len(cm) > 0 else None
+        f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+        precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
+        recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
+        # G-means: sqrt(prod(recall_per_class))
+        recall_per_class = recall_score(all_labels, all_preds, average=None, zero_division=0)
+        G_means = float(np.prod(recall_per_class) ** (1.0 / len(recall_per_class))) if len(recall_per_class) > 0 else 0.0
+
+        metrics = {
+            'accuracy': float(accuracy),
+            'accuracy_per_class': accuracy_per_class,
+            'f1_score': float(f1),
+            'precision': float(precision),
+            'recall': float(recall),
+            'G_means': float(G_means)
+        }
+
+        return metrics
 
     def plot_history(self, history, show=False):
         import matplotlib.pyplot as plt
@@ -243,35 +298,50 @@ class Train:
         plt.tight_layout()
 
         save_path = os.path.join(self.save_dir, self.name, self.test_fold)
-
-        if not os.path.exists(os.path.dirname(save_path)):
-            os.makedirs(os.path.dirname(save_path))
-
-        plt.savefig(os.path.join(save_path, f"training_history.png"))
-
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        plt.savefig(os.path.join(save_path, "training_history.png"))
         print(f"Saved training history plot to {save_path}")
-
         if show:
             plt.show()
-
         plt.close()
 
-    def save_json_metrics(self, history_per_fold, metrics_per_fold, save_path=None):
+    def save_fold_results(self, history, metrics, save_path):
         import json
+        
+        os.makedirs(save_path, exist_ok=True)
+
+        # Save fold history
+        history_path = os.path.join(save_path, "history.json")
+        with open(history_path, 'w') as f:
+            json.dump(history, f, indent=4)
+        print(f"Saved fold history to {history_path}")
+
+        # Save fold metrics (test results)
+        metrics_path = os.path.join(save_path, "test_metrics.json")
+        with open(metrics_path, 'w') as f:
+            json.dump(metrics, f, indent=4)
+        print(f"Saved fold test metrics to {metrics_path}")
+
+    def save_json_metrics(self, history, metrics, save_path=None):
+        import json
+
+        if save_path is None:
+            save_path = os.path.join(self.save_dir, self.name)
 
         os.makedirs(save_path, exist_ok=True)
 
-        # Save history per fold
-        history_path = os.path.join(save_path, "history_per_fold.json")
+        # Save overall history from all folds
+        history_path = os.path.join(save_path, "all_folds_history.json")
         with open(history_path, 'w') as f:
-            json.dump(history_per_fold, f, indent=4)
-        print(f"Saved history per fold to {history_path}")
+            json.dump(history, f, indent=4)
+        print(f"Saved all folds history to {history_path}")
 
-        # Save metrics per fold
-        metrics_path = os.path.join(save_path, "metrics_per_fold.json")
+        # Save overall metrics from all folds
+        metrics_path = os.path.join(save_path, "all_folds_metrics.json")
         with open(metrics_path, 'w') as f:
-            json.dump(metrics_per_fold, f, indent=4)
-        print(f"Saved metrics per fold to {metrics_path}")
+            json.dump(metrics, f, indent=4)
+        print(f"Saved all folds metrics to {metrics_path}")
 
 
 
@@ -286,5 +356,5 @@ DATA_PATH = "datasets/augmentation"
 
 # Pass an already instantiated model
 model_instance = SoundCNN(num_classes=10, SqueezeExcitation=False)
-trainer = Train(dataset_root_path=DATA_PATH, name="CNN", model=model_instance, num_classes=10, batch_size=128, epochs=1, learning_rate=1e-3, patience=5, save_dir="results")
+trainer = Train(dataset_root_path=DATA_PATH, name="CNN", model=model_instance, num_classes=10, batch_size=128, epochs=2, learning_rate=1e-3, patience=5)
 trainer.run(folds=FOLDS)

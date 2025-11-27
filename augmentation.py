@@ -116,7 +116,7 @@ def apply_augmentation(sound, augmentation_needs):
         out_path = os.path.join(out_dir, filename)
         
         # Guardar como objeto Python (tupla) usando allow_pickle
-        np.save(out_path, np.array((aug_y, class_id, sr), dtype=object))
+        np.save(out_path, np.array((aug_y, sr, class_id), dtype=object))
         print(f"[OK] Saved {out_path}")
     
     
@@ -131,7 +131,7 @@ def apply_augmentation(sound, augmentation_needs):
             filename = f"extra_noise_{i}_{base_name}.npy"
             out_path = os.path.join(out_dir, filename)
             
-            np.save(out_path, np.array((aug_y, class_id, sr), dtype=object))
+            np.save(out_path, np.array((aug_y, sr, class_id), dtype=object))
             print(f"[OK] Saved extra {out_path}")
 
 
