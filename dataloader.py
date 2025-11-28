@@ -12,11 +12,15 @@ import matplotlib.pyplot as plt
 
 class Dataloader():
     
-    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None, verbose : bool = False, include_augmented : bool = False, folds : list[str] = None):
+    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None,
+                 include_augmented : bool = False, use_cache : bool = False,
+                 folds : list[str] = None, verbose : bool = False):
+        
         self.dataset_path : Path = Path(dataset_path) / "urbansound8K"
         self.preprocessing = preprocessing
         self.verbose = verbose
         self.include_augmented = include_augmented
+        self.use_cache = use_cache
         self.folds = folds if folds is not None else [f"fold{i}" for i in range(1, 11)]
         # Garante que os folds estão no formato 'fold1', 'fold2', ...
         self.folds = [f if f.startswith('fold') else f"fold{f}" for f in self.folds]
@@ -28,7 +32,15 @@ class Dataloader():
         self.clip_ids = list(self.all_clips.keys())
         self.n_original_clips = len(self.all_clips)
 
-        if include_augmented:
+        if self.use_cache:
+            self.include_augmented = False
+            
+            self.cache_path = config.PROJECT_ROOT / "datasets" / "cache"
+            cache_metadata_path = self.cache_path / "cached_files_index.json"
+            
+            self.cache_metadata = json.load(open(cache_metadata_path))
+        
+        if self.include_augmented:
             self.augmented_path = config.PROJECT_ROOT / "datasets" / "augmentation"
             augmented_metadata_path = self.augmented_path / "augmented_files_index.json"
             self.augmented_metadata = json.load(open(augmented_metadata_path))
@@ -71,7 +83,29 @@ class Dataloader():
         plt.ylabel("Amplitude")
         plt.show()
     
+    def _get_item_from_cache(self, i : int) -> tuple[np.ndarray, int]:
+        metadata = self.cache_metadata[i]
+        file_path = config.PROJECT_ROOT / metadata['path']
+        data = np.load(file_path, allow_pickle=True)
+        
+        features = data[0]
+        fold = data[1]
+        label = data[2]
+        
+        if self.verbose :
+            print(f"Item of index {i} (from cache)")
+            print(f"Loaded from: {file_path}")
+            print(f"Fold: {fold}")
+            print(f"Label: {label}")
+            print("="*30)
+        
+        return features, fold, label
+    
     def __getitem__(self, i : int) -> tuple[np.ndarray, int]:
+        
+        if self.use_cache:
+            return self._get_item_from_cache(i)
+        else: pass
         
         if i in range(0, self.n_original_clips):
             clip_id = self.clip_ids[i]
