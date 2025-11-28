@@ -12,15 +12,26 @@ import matplotlib.pyplot as plt
 
 class Dataloader():
     
-    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None, verbose : bool = False, include_augmented : bool = False):
+    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None,
+                  include_augmented : bool = False, use_cache : bool = False,
+                  verbose : bool = False):
+        
         self.dataset_path : Path = Path(dataset_path) / "urbansound8K"
         self.preprocessing = preprocessing
         self.verbose = verbose
         self.include_augmented = include_augmented
+        self.use_cache = use_cache
         self.dataset = soundata.initialize("urbansound8k", data_home=self.dataset_path)
         self.all_clips = self.dataset.load_clips()
         self.n_original_clips = len(self.all_clips)
         self.clip_ids = list(self.all_clips.keys())
+        
+        if self.use_cache:
+            self.include_augmented = False
+            
+            self.cache_path = config.PROJECT_ROOT / "datasets" / "cache"
+            cache_metadata_path = self.cache_path / "cache_index.json"
+            self.cache_metadata = json.load(open(cache_metadata_path))
         
         if include_augmented:
             self.augmented_path = config.PROJECT_ROOT / "datasets" / "augmentation"
@@ -28,6 +39,8 @@ class Dataloader():
             
             self.augmented_metadata = json.load(open(augmented_metadata_path))
             self.n_augmented_clips = len(self.augmented_metadata)
+        
+        
         
         if self.verbose: print(f"Dataset loaded with {len(self)} clips\n")
     
@@ -64,7 +77,23 @@ class Dataloader():
         plt.ylabel("Amplitude")
         plt.show()
     
+    def _get_item_cached(self, i : int) -> tuple[np.ndarray, int]:
+        metadata = self.cache_metadata[i]
+        
+        file_path = config.PROJECT_ROOT / metadata['path']
+        fold = metadata["fold"]
+        
+        data = np.load(file_path, allow_pickle=True)
+        audio = data[0]
+        sample_rate = data[1]
+        label = metadata[2]
+        
+        return audio, fold, label
+    
     def __getitem__(self, i : int) -> tuple[np.ndarray, int]:
+        
+        if self.use_cache: return self._get_item_cached(i)
+        else: pass
         
         if i in range(0, self.n_original_clips):
             clip_id = self.clip_ids[i]
