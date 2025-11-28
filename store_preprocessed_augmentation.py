@@ -55,10 +55,10 @@ def process_augmented_clip(args):
 
 def main():
     # Define paths
-    CACHE_DIR = config.PROJECT_ROOT / "datasets" / "cache"
+    CACHE_DIR = config.PROJECT_ROOT / "datasets" / "augmentation_cache"
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     
-    METADATA_FILE = CACHE_DIR / "cached_files_index.json"
+    METADATA_FILE = CACHE_DIR / "augmentation_cached_files_index.json"
 
     # Load existing metadata if it exists
     metadata_list = []
@@ -95,7 +95,7 @@ def main():
     existing_filenames = {item['filename'] for item in metadata_list}
     
     # Use ThreadPoolExecutor for parallel processing
-    max_workers = min(8, os.cpu_count() or 1)
+    max_workers = min(16, os.cpu_count() or 1)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
         futures = [executor.submit(process_augmented_clip, (i, dl, CACHE_DIR, existing_filenames)) 

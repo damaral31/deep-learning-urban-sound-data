@@ -1,113 +1,26 @@
-"""
-Módulo SoundRNN - Rede Neural Recorrente para classificação de áudio urbano
-
-Este módulo implementa modelos RNN (Recurrent Neural Network) para capturar
-dependências temporais em espectrogramas de sons urbanos.
-
-Tipos de RNN implementados:
-1. SoundRNN: RNN simples (vanilla RNN)
-2. SoundGRU: RNN com Gated Recurrent Units (mais eficiente que LSTM)
-3. SoundBiRNN: RNN Bidirecional (combina contexto anterior e posterior)
-
-Comparação: CNN vs RNN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                CNN         RNN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Força       Padrões      Sequências
-            espaciais    temporais
-
-Fraqueza    Sequências   Padrões
-            longas       espaciais
-
-Melhor      Imagens      Áudio, Texto,
-para        básicas      Vídeo
-
-Problema    Vanishing    Vanishing
-            -            Gradient
-
-Solução     N/A          LSTM/GRU
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Por que RNN para áudio urbano?
-- Sons urbanos têm estrutura temporal importante
-- Uma sirene evolui: início → meio → fim
-- O contexto passado ajuda a prever o futuro
-- Perfil acústico varia ao longo do tempo
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class SoundRNN(nn.Module):
-    """
-    Rede Neural Recorrente (RNN) Vanilla para classificação de sons urbanos.
-    
-    Uma RNN vanilla é a forma mais simples de rede recorrente:
-    - Lê a sequência de entrada frame por frame
-    - Mantém um estado oculto que atualiza a cada timestep
-    - O estado oculto contém informação do passado
-    
-    Vantagens:
-    - Simples e rápida
-    - Fácil de entender e debugar
-    
-    Desvantagens:
-    - Sofre de "vanishing gradient" em sequências longas
-    - Esquece informações antigas rapidamente
-    
-    Fórmula RNN:
-    h_t = tanh(W_ih * x_t + W_hh * h_(t-1) + b)
-    
-    Onde:
-    - x_t: entrada no timestep t
-    - h_t: estado oculto no timestep t
-    - W_ih, W_hh: pesos (input-to-hidden, hidden-to-hidden)
-    - tanh: ativação não-linear
-    
-    Fluxo:
-    Input [batch, 1, 40, 174]
-         ↓
-    Conv [batch, 32, 40, 174]
-         ↓
-    Reshape [batch, 174, 640]
-         ↓
-    RNN (174 timesteps)
-         ↓
-    FC [batch, 10]
-    """
-    
-    def __init__(self, num_classes=10, input_height=40, input_width=174,
+    def __init__(self, num_classes=10, input_height=64, input_width=173,
                  hidden_size=128, num_layers=2, dropout_rate=0.5, in_channels=1):
-        """
-        Inicializa o modelo RNN.
-        
-        Args:
-            num_classes (int): Número de categorias (10 para Urban Sound)
-            input_height (int): Altura do espectrograma (40 mel bins)
-            input_width (int): Largura do espectrograma (174 frames)
-            hidden_size (int): Tamanho do estado oculto (padrão: 128)
-            num_layers (int): Número de camadas RNN empilhadas (padrão: 2)
-            dropout_rate (float): Taxa de dropout (padrão: 0.5)
-        """
         super(SoundRNN, self).__init__()
         
-        # ========== CAMADA CONVOLUCIONAL ==========
-        # Extrai features 2D do espectrograma
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.bn_conv1 = nn.BatchNorm2d(32)
-        # Pool apenas em altura (mantém sequência temporal)
         self.pool_conv = nn.MaxPool2d(kernel_size=(2, 1))
         
-        # ========== CAMADA RNN VANILLA ==========
-        # Processa sequência temporal
-        rnn_input_size = 32 * (input_height // 2)  # 640
+        # Calculate actual dimensions after conv and pooling
+        # Conv2d with padding=1 keeps spatial dims the same
+        # MaxPool2d with kernel=(2,1) reduces height by 2
+        pooled_height = input_height // 2
+        pooled_width = input_width  # MaxPool kernel is (2,1), so width unchanged
         
-        # RNN (Vanilla)
-        # - nonlinearity: 'tanh' ou 'relu'
-        # - tanh é padrão (mais suave)
-        # - relu é mais rápido (mas problema com vanishing gradient)
+        # RNN input size = channels * height after pooling
+        rnn_input_size = 32 * pooled_height
+        
         self.rnn = nn.RNN(
             input_size=rnn_input_size,
             hidden_size=hidden_size,
@@ -117,56 +30,41 @@ class SoundRNN(nn.Module):
             nonlinearity='tanh'
         )
         
-        # ========== CAMADAS FULLY-CONNECTED ==========
         self.fc1 = nn.Linear(hidden_size, 128)
         self.bn_fc1 = nn.BatchNorm1d(128)
         self.fc2 = nn.Linear(128, num_classes)
-        
-        # ========== REGULARIZAÇÃO ==========
         self.dropout = nn.Dropout(dropout_rate)
-        
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-    
+
     def forward(self, x):
-        """
-        Forward pass da RNN.
-        
-        Args:
-            x: [batch, 1, 40, 174]
-            
-        Returns:
-            output: [batch, 10]
-        """
         batch_size = x.size(0)
         
-        # ========== CONVOLUÇÃO ==========
-        x = self.conv1(x)              # [batch, 32, 40, 174]
+        # Conv and pooling
+        x = self.conv1(x)
         x = self.bn_conv1(x)
         x = F.relu(x)
-        x = self.pool_conv(x)          # [batch, 32, 20, 174]
+        x = self.pool_conv(x)
         
-        # ========== RESHAPE PARA SEQUÊNCIA ==========
-        x = x.view(batch_size, x.size(3), -1)  # [batch, 174, 640]
+        # x shape: [batch, 32, height//2, width]
+        _, channels, height, time = x.shape
         
-        # ========== RNN ==========
-        # Processa cada frame temporal sequencialmente
-        # Forward retorna:
-        # - output: todos os hidden states
-        # - h_n: último hidden state (o que contém contexto)
+        # Reshape for RNN: [batch, time_steps, features]
+        # We treat time dimension as sequence, and (channels * height) as features
+        x = x.permute(0, 3, 1, 2)  # [batch, time, channels, height]
+        x = x.contiguous().view(batch_size, time, channels * height)
+        
+        # RNN forward
         rnn_out, h_n = self.rnn(x)
-        # rnn_out: [batch, 174, 128] (todos timesteps)
-        # h_n: [num_layers, batch, 128] (último timestep)
         
-        # Usar último hidden state (contém contexto da sequência inteira)
-        x = h_n[-1]  # [batch, 128]
+        # Use final hidden state
+        x = h_n[-1]  # [batch, hidden_size]
         
-        # ========== CLASSIFICAÇÃO ==========
-        x = self.fc1(x)                # [batch, 128]
+        # Fully connected layers
+        x = self.fc1(x)
         x = self.bn_fc1(x)
         x = F.relu(x)
         x = self.dropout(x)
-        x = self.fc2(x)                # [batch, 10]
+        x = self.fc2(x)
         
         return x
-

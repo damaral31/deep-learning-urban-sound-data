@@ -158,7 +158,7 @@ class Train:
 
             self.val_fold = folds[(test_idx + 1) % len(folds)]
             self.train_folds = [f for f in folds if f != self.test_fold and f != self.val_fold]
-            print(f"\n=== Test = {self.test_fold}, Validation = {self.val_fold} ===")
+            print(f"\n=== Train {self.train_folds}, Validation = {self.val_fold}, Test = {self.test_fold} ===")
 
             fold_history = {
                 'train_acc': [], 
@@ -174,14 +174,13 @@ class Train:
 
             
             if self.dataset_type == "preprocessing" or self.dataset_type == "singlechannel":
-                test_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.test_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
-                val_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.val_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
-                train_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=self.train_folds, include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=True)
+                test_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.test_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                val_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.val_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                train_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=self.train_folds, include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=True)
             else:  # augmentation_preprocessing or augmentation_singlechannel
-                test_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.test_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
-                val_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.val_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
-                train_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=self.train_folds, include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=True)
-
+                test_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.test_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                val_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.val_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                train_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=self.train_folds, include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=True)
 
             for epoch in range(1, self.epochs+1):
                 print(f"\n--- Epoch {epoch}/{self.epochs} ---")
@@ -372,16 +371,16 @@ class Train:
 
 
 
-
+'''
 # ============== MOCK TEST =================
 from models.CNN import SoundCNN
 
 import os
 
-FOLDS = ["fold1"]
+FOLDS = [f"fold{i}" for i in range(1, 11)]
 DATA_PATH = "datasets"
 
 # Pass an already instantiated model
 model_instance = SoundCNN(num_classes=10, SqueezeExcitation=False)
 trainer = Train(dataset_root_path=DATA_PATH,name="CNN", dataset_type="singlechannel", model=model_instance, num_classes=10, batch_size=128, epochs=2, learning_rate=1e-3, patience=5)
-trainer.run(folds=FOLDS)
+trainer.run(folds=FOLDS)'''

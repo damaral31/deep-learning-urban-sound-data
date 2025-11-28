@@ -42,12 +42,12 @@ class ChannelAttentionBlock(nn.Module):
         return x * out.expand_as(x)
 
 class SoundCNN(nn.Module):
-    def __init__(self, num_classes=10, SqueezeExcitation=False, AttentionBlock=False, input_channels=1):
+    def __init__(self, num_classes=10, SqueezeExcitation=False, AttentionBlock=False, in_channels=1):
         super(SoundCNN, self).__init__()
         self.SqueezeExcitation = SqueezeExcitation
         self.AttentionBlock = AttentionBlock
 
-        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(64)

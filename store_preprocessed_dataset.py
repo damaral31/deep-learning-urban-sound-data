@@ -68,7 +68,7 @@ def main():
     print(f"Starting processing of {len(dl)} clips...")
     
     # Use ThreadPoolExecutor for parallel processing
-    max_workers = min(8, os.cpu_count() or 1)
+    max_workers = min(16, os.cpu_count() or 1)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
         futures = [executor.submit(process_clip, (i, dl, CACHE_DIR)) for i in range(len(dl))]

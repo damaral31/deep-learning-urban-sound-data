@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class SoundGRU(nn.Module):
     """
     Rede com Gated Recurrent Units (GRU) para classificação de sons urbanos.
@@ -50,8 +51,10 @@ class SoundGRU(nn.Module):
         self.pool_conv = nn.MaxPool2d(kernel_size=(2, 1))
         
         # ========== CAMADA GRU ==========
-        # GRU é similar a RNN, mas com gates para melhor aprendizado
-        rnn_input_size = 32 * (input_height // 2)
+        # Calcular tamanho de entrada para GRU
+        # MaxPool (2,1) reduz altura por 2, mas não afeta largura
+        pooled_height = input_height // 2
+        rnn_input_size = 32 * pooled_height
         
         self.gru = nn.GRU(
             input_size=rnn_input_size,
@@ -59,7 +62,7 @@ class SoundGRU(nn.Module):
             num_layers=num_layers,
             batch_first=True,
             dropout=dropout_rate if num_layers > 1 else 0,
-            bidirectional=False  # Unidirecional (podia ser bidirecional também)
+            bidirectional=False  # Unidirecional
         )
         
         # ========== CAMADAS FULLY-CONNECTED ==========
@@ -78,17 +81,19 @@ class SoundGRU(nn.Module):
         batch_size = x.size(0)
         
         # Convolução
-        x = self.conv1(x)
+        x = self.conv1(x)          # [batch, 32, height, width]
         x = self.bn_conv1(x)
         x = F.relu(x)
-        x = self.pool_conv(x)
+        x = self.pool_conv(x)      # [batch, 32, height//2, width]
         
-        # Reshape
-        x = x.view(batch_size, x.size(3), -1)
+        # Reshape para GRU: [batch, time_steps, features]
+        _, channels, height, time = x.shape
+        x = x.permute(0, 3, 1, 2)  # [batch, time, channels, height]
+        x = x.contiguous().view(batch_size, time, channels * height)
         
-        # GRU
-        gru_out, h_n = self.gru(x)
-        x = h_n[-1]  # Último hidden state
+        # GRU forward
+        gru_out, h_n = self.gru(x)  # h_n: [num_layers, batch, hidden_size]
+        x = h_n[-1]                 # Último hidden state: [batch, hidden_size]
         
         # FC layers
         x = self.fc1(x)
