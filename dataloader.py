@@ -33,20 +33,12 @@ class Dataloader():
         self.n_original_clips = len(self.all_clips)
 
         if self.use_cache:
-            self.include_augmented = False
-            
-            self.cache_path = config.PROJECT_ROOT / "datasets" / "cache"
-            cache_metadata_path = self.cache_path / "cached_files_index.json"
-            
+            self.original_cache_path = config.PROJECT_ROOT / "datasets" / "cache"
+            cache_metadata_path = self.original_cache_path / "cached_files_index.json"
+            self.augmentation_cache_path = config.PROJECT_ROOT / "datasets" / "augmentation_cache"
+            augmentation_cache_metadata_path = self.augmentation_cache_path / "augmentation_cache_files_index.json"
             self.cache_metadata = json.load(open(cache_metadata_path))
-        
-        if self.include_augmented:
-            self.augmented_path = config.PROJECT_ROOT / "datasets" / "augmentation"
-            augmented_metadata_path = self.augmented_path / "augmented_files_index.json"
-            self.augmented_metadata = json.load(open(augmented_metadata_path))
-            # Filtra os metadados para os folds desejados
-            self.augmented_metadata = [m for m in self.augmented_metadata if m.get('fold') in self.folds or f"fold{m.get('fold')}" in self.folds or str(m.get('fold')) in self.folds or f"fold{str(m.get('fold'))}" in self.folds]
-            self.n_augmented_clips = len(self.augmented_metadata)
+            self.augmentation_cache  = json.load(open(augmentation_cache_metadata_path))
 
         if self.verbose: print(f"Dataset loaded with {len(self)} clips (folds: {self.folds})\n")
     
@@ -84,7 +76,12 @@ class Dataloader():
         plt.show()
     
     def _get_item_from_cache(self, i : int) -> tuple[np.ndarray, int]:
-        metadata = self.cache_metadata[i]
+        
+        if i < self.n_original_clips:
+            metadata = self.cache_metadata[i]
+        elif self.include_augmented and i >= self.n_original_clips:
+            metadata = self.augmentation_cache[i - self.n_original_clips]
+
         file_path = config.PROJECT_ROOT / metadata['path']
         data = np.load(file_path, allow_pickle=True)
         
@@ -121,25 +118,6 @@ class Dataloader():
                 print(f"Class ID: {clip.class_id}")
                 print(f"Class Label: {clip.class_label}")
                 print(f"Salience: {clip.salience}")
-                print("="*30)
-            
-        elif self.include_augmented and i in range(self.n_original_clips, len(self)):
-            augmented_index = i - self.n_original_clips
-            
-            metadata = self.augmented_metadata[augmented_index]
-            file_path = config.PROJECT_ROOT / metadata['path']
-            data = np.load(file_path, allow_pickle=True)
-            
-            audio = data[0]
-            sample_rate = data[1]
-            label = data[2]
-            fold = metadata["fold"]
-            
-            if self.verbose :
-                print(f"Item of index {i} (augmented)")
-                print(f"Loaded from: {file_path}")
-                print(f"Fold: {fold}")
-                print(f"Label: {label}")
                 print("="*30)
         
         if self.preprocessing is not None:
