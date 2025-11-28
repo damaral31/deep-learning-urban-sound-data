@@ -47,7 +47,7 @@ class SoundLSTM(nn.Module):
     """
     
     def __init__(self, num_classes=10, input_height=40, input_width=174,
-                 hidden_size=128, num_layers=2, dropout_rate=0.5):
+                 hidden_size=128, num_layers=2, dropout_rate=0.5, in_channels=1):
         """
         Inicializa o modelo LSTM.
         
@@ -91,7 +91,7 @@ class SoundLSTM(nn.Module):
         # - out_channels=32: extrai 32 características
         # - kernel_size=3: filtro 3x3 para padrões locais
         # - padding=1: mantém o tamanho
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         
         # BatchNorm2d: normaliza outputs da convolução
         # Benefícios:

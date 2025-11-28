@@ -68,6 +68,10 @@ class Train:
         print(f"  Learning rate: {self.learning_rate}")
         print(f"  Early stopping patience: {self.patience}")
         print(f"  Save directory: {self.save_dir}")
+        print(f"  Dataset type: {self.dataset_type}")
+        print("Loss function: CrossEntropyLoss")
+        print(f"Regularization (L2 weight decay): {self.regularization}")
+        print(f"Optimizer: Adam\n")
 
         
     def epoch(self, dataloader):
@@ -79,15 +83,13 @@ class Train:
         progress_bar = tqdm(dataloader, desc="Training", leave=True)
         for batch_idx, (inputs, folds, labels) in enumerate(progress_bar):
 
-            print(f"Inputs shape: {inputs.shape}")
+            #print(f"Inputs shape: {inputs.shape}")
 
             # Seleciona apenas o primeiro canal de cada input
             if self.dataset_type == "singlechannel" or self.dataset_type == "augmentation_singlechannel":
-                inputs = inputs[:, 0, ...]
+                inputs = inputs[:, 0, ...].unsqueeze(1)
 
-            print(f"Inputs shape after channel selection: {inputs.shape}")
-
-            return
+            #print(f"Inputs shape after channel selection: {inputs.shape}")
 
             inputs, labels = inputs.to(self.device), labels.to(self.device)
             self.optimizer.zero_grad()
@@ -120,7 +122,7 @@ class Train:
             for inputs, folds, labels in progress_bar:
 
                 if self.dataset_type == "singlechannel" or self.dataset_type == "augmentation_singlechannel":
-                    inputs = inputs[:, 0, ...]
+                    inputs = inputs[:, 0, ...].unsqueeze(1)
 
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 outputs = self.model(inputs)
@@ -155,7 +157,7 @@ class Train:
             self.model.load_state_dict(copy.deepcopy(initial_model_state))
 
             self.val_fold = folds[(test_idx + 1) % len(folds)]
-            self.train_folds = [f for f in folds if f != self.test_fold or f != self.val_fold]
+            self.train_folds = [f for f in folds if f != self.test_fold and f != self.val_fold]
             print(f"\n=== Test = {self.test_fold}, Validation = {self.val_fold} ===")
 
             fold_history = {
@@ -217,11 +219,11 @@ class Train:
             self.plot_history(fold_history)
             
             # Guardar resultados específicos deste fold
-            fold_save_path = os.path.join(self.save_dir, self.name, self.test_fold)
+            fold_save_path = os.path.join(self.save_dir, self.dataset_type, self.name, self.test_fold)
             self.save_fold_results(fold_history, metrics, fold_save_path)
 
         # Guardar resumo geral de todos os folds
-        self.save_json_metrics(history_per_fold, metrics_per_fold, save_path=os.path.join(self.save_dir, self.name, "overall"))
+        self.save_json_metrics(history_per_fold, metrics_per_fold, save_path=os.path.join(self.save_dir, self.dataset_type, self.name, "overall"))
 
     def test_models(self, best_model_wts, dataloader, test_fold_name, show=False):
         
@@ -239,7 +241,7 @@ class Train:
         with torch.no_grad():
             for inputs, folds, labels in progress_bar:
                 if self.dataset_type == "singlechannel" or self.dataset_type == "augmentation_singlechannel":
-                    inputs = inputs[:, 0, ...]
+                    inputs = inputs[:, 0, ...].unsqueeze(1)
                 inputs = inputs.to(self.device)
                 labels = labels.to(self.device)
                 outputs = self.model(inputs)
@@ -263,7 +265,7 @@ class Train:
             disp.plot(cmap=plt.cm.Blues)
             plt.title(f"Confusion Matrix - {test_fold_name}")
 
-            save_path = os.path.join(self.save_dir, self.name, test_fold_name)
+            save_path = os.path.join(self.save_dir, self.dataset_type, self.name, test_fold_name)
             os.makedirs(save_path, exist_ok=True)
 
             plt.savefig(os.path.join(save_path, "confusion_matrix.png"))
@@ -323,7 +325,7 @@ class Train:
 
         plt.tight_layout()
 
-        save_path = os.path.join(self.save_dir, self.name, self.test_fold)
+        save_path = os.path.join(self.save_dir, self.dataset_type, self.name, self.test_fold)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         plt.savefig(os.path.join(save_path, "training_history.png"))
@@ -352,7 +354,7 @@ class Train:
     def save_json_metrics(self, history, metrics, save_path=None):
 
         if save_path is None:
-            save_path = os.path.join(self.save_dir, self.name)
+            save_path = os.path.join(self.save_dir, self.dataset_type, self.name)
 
         os.makedirs(save_path, exist_ok=True)
 

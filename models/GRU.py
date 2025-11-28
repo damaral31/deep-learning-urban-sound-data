@@ -30,7 +30,7 @@ class SoundGRU(nn.Module):
     """
     
     def __init__(self, num_classes=10, input_height=40, input_width=174,
-                 hidden_size=128, num_layers=2, dropout_rate=0.5):
+                 hidden_size=128, num_layers=2, dropout_rate=0.5, in_channels=1):
         """
         Inicializa o modelo GRU.
         
@@ -45,7 +45,7 @@ class SoundGRU(nn.Module):
         super(SoundGRU, self).__init__()
         
         # ========== CAMADA CONVOLUCIONAL ==========
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.bn_conv1 = nn.BatchNorm2d(32)
         self.pool_conv = nn.MaxPool2d(kernel_size=(2, 1))
         

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SoundTransformer(nn.Module):
-    def __init__(self, n_mels=128, n_frames=174, num_classes=10, d_model=128, nhead=4, num_layers=2, dim_feedforward=256, dropout=0.1):
+    def __init__(self, n_mels=128, n_frames=174, num_classes=10, d_model=128, nhead=4, num_layers=2, dim_feedforward=256, dropout=0.1, in_channels=1):
         super(SoundTransformer, self).__init__()
         self.n_mels = n_mels
         self.n_frames = n_frames
@@ -12,7 +12,7 @@ class SoundTransformer(nn.Module):
         # Project input to d_model
         self.input_proj = nn.Conv2d(1, d_model, kernel_size=1)
         # Positional encoding
-        self.pos_embedding = nn.Parameter(torch.randn(1, n_frames, d_model))
+        self.pos_embedding = nn.Parameter(torch.randn(in_channels, n_frames, d_model))
         # Transformer encoder
         encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
