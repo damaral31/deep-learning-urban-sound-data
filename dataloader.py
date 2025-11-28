@@ -36,7 +36,7 @@ class Dataloader():
             self.original_cache_path = config.PROJECT_ROOT / "datasets" / "cache"
             cache_metadata_path = self.original_cache_path / "cached_files_index.json"
             self.augmentation_cache_path = config.PROJECT_ROOT / "datasets" / "augmentation_cache"
-            augmentation_cache_metadata_path = self.augmentation_cache_path / "augmentation_cache_files_index.json"
+            augmentation_cache_metadata_path = self.augmentation_cache_path / "augmentation_cached_files_index.json"
             self.cache_metadata = json.load(open(cache_metadata_path))
             self.augmentation_cache  = json.load(open(augmentation_cache_metadata_path))
 
