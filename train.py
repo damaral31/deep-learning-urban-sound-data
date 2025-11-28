@@ -7,7 +7,8 @@ class Train:
     def __init__(self,
                  dataset_root_path,
                  name : str,
-                 model, 
+                 model,
+                 dataset_type: str = "preprocessing",
                  num_classes=10, 
                  batch_size=32, 
                  epochs=30, 
@@ -15,6 +16,9 @@ class Train:
                  patience=5, 
                  save_dir=os.path.join(os.getcwd(), "results")):
         
+
+        assert dataset_type in ["preprocessing", "augmentation_preprocessing", "singlechannel", "augmentation_singlechannel"], f"Invalid dataset_type: {dataset_type}. Must be one of ['preprocessing', 'augmentation_preprocessing', 'singlechannel', 'augmentation_singlechannel']."
+
 
         self.dataset_root_path = dataset_root_path
         if not os.path.exists(dataset_root_path):

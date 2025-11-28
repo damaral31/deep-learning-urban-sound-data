@@ -24,11 +24,11 @@ CLASS_DISTRIBUTION = pd.read_csv(class_distribution_path)
 #  AUGMENTATION FUNCTIONS
 # ============================================================
 
-def time_shift(y, sr, shift_max=0.5):
+'''def time_shift(y, sr, shift_max=0.5):
     """Desloca o áudio no tempo em até shift_max segundos."""
     shift = int(sr * shift_max)
     shift = np.random.randint(-shift, shift)
-    return np.roll(y, shift)
+    return np.roll(y, shift)'''
 
 
 def add_white_noise(y, noise_factor=0.005):
@@ -98,7 +98,6 @@ def apply_augmentation(sound, augmentation_needs):
 
     # lista de augmentations básicas disponíveis
     augmentations = {
-        "shift": time_shift(y, sr),
         "white_noise": add_white_noise(y),
         "bandpass": butter_bandpass_filter(y, sr)
     }
@@ -176,7 +175,7 @@ if __name__ == "__main__":
     print("Iniciando augmentação...")
     print("="*60 + "\n")
     
-    dl = Dataloader(r"E:\deep-learning-urban-sound-data\datasets", verbose=False)
+    dl = Dataloader(r"C:\Users\diogo\OneDrive\Documents\GitHub\deep-learning-urban-sound-data\datasets", verbose=False)
     
     all_files_metadata = []
     l = len(dl)
@@ -208,7 +207,7 @@ if __name__ == "__main__":
         original_count = int(row['count'])
         
         # Augmentação básica: 3 augmentações + original = 4x
-        basic_augmented = original_count * 4
+        basic_augmented = original_count * 3
         
         # Augmentação extra
         extras = augmentation_needs[class_id] * original_count

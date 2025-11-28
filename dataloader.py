@@ -12,37 +12,31 @@ import matplotlib.pyplot as plt
 
 class Dataloader():
     
-    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None,
-                  include_augmented : bool = False, use_cache : bool = False,
-                  verbose : bool = False):
-        
+    def __init__(self, dataset_path : str, preprocessing : AudioPreprocessor = None, verbose : bool = False, include_augmented : bool = False, folds : list[str] = None):
         self.dataset_path : Path = Path(dataset_path) / "urbansound8K"
         self.preprocessing = preprocessing
         self.verbose = verbose
         self.include_augmented = include_augmented
-        self.use_cache = use_cache
+        self.folds = folds if folds is not None else [f"fold{i}" for i in range(1, 11)]
+        # Garante que os folds estão no formato 'fold1', 'fold2', ...
+        self.folds = [f if f.startswith('fold') else f"fold{f}" for f in self.folds]
+
         self.dataset = soundata.initialize("urbansound8k", data_home=self.dataset_path)
-        self.all_clips = self.dataset.load_clips()
-        self.n_original_clips = len(self.all_clips)
+        all_clips = self.dataset.load_clips()
+        # Filtra os clips para os folds desejados
+        self.all_clips = {k: v for k, v in all_clips.items() if f"fold{v.fold}" in self.folds or v.fold in self.folds or str(v.fold) in self.folds or f"fold{str(v.fold)}" in self.folds}
         self.clip_ids = list(self.all_clips.keys())
-        
-        if self.use_cache:
-            self.include_augmented = False
-            
-            self.cache_path = config.PROJECT_ROOT / "datasets" / "cache"
-            cache_metadata_path = self.cache_path / "cache_index.json"
-            self.cache_metadata = json.load(open(cache_metadata_path))
-        
+        self.n_original_clips = len(self.all_clips)
+
         if include_augmented:
             self.augmented_path = config.PROJECT_ROOT / "datasets" / "augmentation"
             augmented_metadata_path = self.augmented_path / "augmented_files_index.json"
-            
             self.augmented_metadata = json.load(open(augmented_metadata_path))
+            # Filtra os metadados para os folds desejados
+            self.augmented_metadata = [m for m in self.augmented_metadata if m.get('fold') in self.folds or f"fold{m.get('fold')}" in self.folds or str(m.get('fold')) in self.folds or f"fold{str(m.get('fold'))}" in self.folds]
             self.n_augmented_clips = len(self.augmented_metadata)
-        
-        
-        
-        if self.verbose: print(f"Dataset loaded with {len(self)} clips\n")
+
+        if self.verbose: print(f"Dataset loaded with {len(self)} clips (folds: {self.folds})\n")
     
     def no_preprocessing(self, audio : np.ndarray, sample_rate : int):
         return audio
@@ -68,7 +62,7 @@ class Dataloader():
         }
         return class_mapping
     
-    def plot_waveform(self, audio : np.ndarray):
+    def plot_waveform(self, audio : np.ndarray, sample_rate : int):
         
         plt.figure(figsize=(10, 4))
         plt.plot(audio)
@@ -77,23 +71,7 @@ class Dataloader():
         plt.ylabel("Amplitude")
         plt.show()
     
-    def _get_item_cached(self, i : int) -> tuple[np.ndarray, int]:
-        metadata = self.cache_metadata[i]
-        
-        file_path = config.PROJECT_ROOT / metadata['path']
-        fold = metadata["fold"]
-        
-        data = np.load(file_path, allow_pickle=True)
-        audio = data[0]
-        sample_rate = data[1]
-        label = metadata[2]
-        
-        return audio, fold, label
-    
     def __getitem__(self, i : int) -> tuple[np.ndarray, int]:
-        
-        if self.use_cache: return self._get_item_cached(i)
-        else: pass
         
         if i in range(0, self.n_original_clips):
             clip_id = self.clip_ids[i]
