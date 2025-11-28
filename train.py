@@ -1,7 +1,14 @@
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 import torch
 import os
-from npyLoader import UrbanSoundNPYLoader
+from dataloader import Dataloader as MyLoader
+from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
+from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
+from tqdm import tqdm
+import numpy as np
+import copy
+import json
 
 class Train:
     def __init__(self,
@@ -18,7 +25,7 @@ class Train:
         
 
         assert dataset_type in ["preprocessing", "augmentation_preprocessing", "singlechannel", "augmentation_singlechannel"], f"Invalid dataset_type: {dataset_type}. Must be one of ['preprocessing', 'augmentation_preprocessing', 'singlechannel', 'augmentation_singlechannel']."
-
+        self.dataset_type = dataset_type
 
         self.dataset_root_path = dataset_root_path
         if not os.path.exists(dataset_root_path):
@@ -64,14 +71,24 @@ class Train:
 
         
     def epoch(self, dataloader):
-        from tqdm import tqdm
         
         self.model.to(self.device)
         self.model.train()
         running_loss, correct, total = 0.0, 0, 0
         
         progress_bar = tqdm(dataloader, desc="Training", leave=True)
-        for batch_idx, (inputs, labels) in enumerate(progress_bar):
+        for batch_idx, (inputs, folds, labels) in enumerate(progress_bar):
+
+            print(f"Inputs shape: {inputs.shape}")
+
+            # Seleciona apenas o primeiro canal de cada input
+            if self.dataset_type == "singlechannel" or self.dataset_type == "augmentation_singlechannel":
+                inputs = inputs[:, 0, ...]
+
+            print(f"Inputs shape after channel selection: {inputs.shape}")
+
+            return
+
             inputs, labels = inputs.to(self.device), labels.to(self.device)
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
@@ -92,9 +109,7 @@ class Train:
         accuracy = correct / total if total > 0 else 0.0
         return avg_loss, accuracy
 
-
     def validate(self, dataloader):
-        from tqdm import tqdm
         
         self.model.to(self.device)
         self.model.eval()
@@ -102,7 +117,11 @@ class Train:
         
         progress_bar = tqdm(dataloader, desc="Validating", leave=True)
         with torch.no_grad():
-            for inputs, labels in progress_bar:
+            for inputs, folds, labels in progress_bar:
+
+                if self.dataset_type == "singlechannel" or self.dataset_type == "augmentation_singlechannel":
+                    inputs = inputs[:, 0, ...]
+
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, labels)
@@ -122,7 +141,7 @@ class Train:
 
     def run(self, folds):
 
-        import copy
+        
         print("\nStarting training with cross-validation...\n")
 
         history_per_fold = {}
@@ -151,10 +170,16 @@ class Train:
             best_val_loss = float('inf')
             epochs_no_improve = 0
 
-            from torch.utils.data import DataLoader
-            test_loader = DataLoader(UrbanSoundNPYLoader(base_path=self.dataset_root_path, folders=[self.test_fold], pad_length=88200, shuffle=False), batch_size=self.batch_size, shuffle=False)
-            val_loader = DataLoader(UrbanSoundNPYLoader(base_path=self.dataset_root_path, folders=[self.val_fold], pad_length=88200, shuffle=True), batch_size=self.batch_size, shuffle=False)
-            train_loader = DataLoader(UrbanSoundNPYLoader(base_path=self.dataset_root_path, folders=self.train_folds, pad_length=88200, shuffle=True), batch_size=self.batch_size, shuffle=True)
+            
+            if self.dataset_type == "preprocessing" or self.dataset_type == "singlechannel":
+                test_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.test_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                val_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.val_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                train_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=self.train_folds, include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=True)
+            else:  # augmentation_preprocessing or augmentation_singlechannel
+                test_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.test_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                val_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=[self.val_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                train_loader = DataLoader(MyLoader(base_path=self.dataset_root_path, folders=self.train_folds, include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=True)
+
 
             for epoch in range(1, self.epochs+1):
                 print(f"\n--- Epoch {epoch}/{self.epochs} ---")
@@ -199,10 +224,7 @@ class Train:
         self.save_json_metrics(history_per_fold, metrics_per_fold, save_path=os.path.join(self.save_dir, self.name, "overall"))
 
     def test_models(self, best_model_wts, dataloader, test_fold_name, show=False):
-        import matplotlib.pyplot as plt
-        from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
-        from tqdm import tqdm
-        import numpy as np
+        
 
         self.model.load_state_dict(best_model_wts)
         self.model.to(self.device)
@@ -215,7 +237,9 @@ class Train:
 
         progress_bar = tqdm(dataloader, desc="Testing", leave=True)
         with torch.no_grad():
-            for inputs, labels in progress_bar:
+            for inputs, folds, labels in progress_bar:
+                if self.dataset_type == "singlechannel" or self.dataset_type == "augmentation_singlechannel":
+                    inputs = inputs[:, 0, ...]
                 inputs = inputs.to(self.device)
                 labels = labels.to(self.device)
                 outputs = self.model(inputs)
@@ -271,7 +295,7 @@ class Train:
         return metrics
 
     def plot_history(self, history, show=False):
-        import matplotlib.pyplot as plt
+        
 
         os.makedirs(self.save_dir, exist_ok=True)
 
@@ -309,7 +333,7 @@ class Train:
         plt.close()
 
     def save_fold_results(self, history, metrics, save_path):
-        import json
+        
         
         os.makedirs(save_path, exist_ok=True)
 
@@ -326,7 +350,6 @@ class Train:
         print(f"Saved fold test metrics to {metrics_path}")
 
     def save_json_metrics(self, history, metrics, save_path=None):
-        import json
 
         if save_path is None:
             save_path = os.path.join(self.save_dir, self.name)
@@ -354,9 +377,9 @@ from models.CNN import SoundCNN
 import os
 
 FOLDS = ["fold1"]
-DATA_PATH = "datasets/augmentation"
+DATA_PATH = "datasets"
 
 # Pass an already instantiated model
 model_instance = SoundCNN(num_classes=10, SqueezeExcitation=False)
-trainer = Train(dataset_root_path=DATA_PATH, name="CNN", model=model_instance, num_classes=10, batch_size=128, epochs=2, learning_rate=1e-3, patience=5)
+trainer = Train(dataset_root_path=DATA_PATH,name="CNN", dataset_type="singlechannel", model=model_instance, num_classes=10, batch_size=128, epochs=2, learning_rate=1e-3, patience=5)
 trainer.run(folds=FOLDS)
