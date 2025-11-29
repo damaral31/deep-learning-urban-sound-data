@@ -16,7 +16,8 @@ class Dataloader():
                  include_augmented : bool = False, use_cache : bool = False,
                  folds : list[str] = None, verbose : bool = False):
         
-        self.dataset_path : Path = Path(dataset_path) / "urbansound8K"
+        self.n_augmented_clips = 0
+        self.dataset_path : Path = Path(dataset_path) / "urbansound8k"
         self.preprocessing = preprocessing
         self.verbose = verbose
         self.include_augmented = include_augmented
@@ -36,10 +37,16 @@ class Dataloader():
             self.original_cache_path = config.PROJECT_ROOT / "datasets" / "cache"
             cache_metadata_path = self.original_cache_path / "cached_files_index.json"
             self.augmentation_cache_path = config.PROJECT_ROOT / "datasets" / "augmentation_cache"
-            augmentation_cache_metadata_path = self.augmentation_cache_path / "augmentation_cache_files_index.json"
+            augmentation_cache_metadata_path = self.augmentation_cache_path / "augmentation_cached_files_index.json"
             self.cache_metadata = json.load(open(cache_metadata_path))
             self.augmentation_cache  = json.load(open(augmentation_cache_metadata_path))
-
+            self.n_augmented_clips = len(self.augmentation_cache)
+        else:
+            if self.include_augmented:
+                self.n_augmentation_path = config.PROJECT_ROOT / "datasets" / "augmentation"
+                augmentation_metadata_path = self.n_augmentation_path / "augmented_files_index.json"
+                self.augmentation_metadata = json.load(open(augmentation_metadata_path))
+                self.n_augmented_clips = len(self.augmentation_metadata)
         if self.verbose: print(f"Dataset loaded with {len(self)} clips (folds: {self.folds})\n")
     
     def no_preprocessing(self, audio : np.ndarray, sample_rate : int):
@@ -66,7 +73,7 @@ class Dataloader():
         }
         return class_mapping
     
-    def plot_waveform(self, audio : np.ndarray, sample_rate : int):
+    def plot_waveform(self, audio : np.ndarray):
         
         plt.figure(figsize=(10, 4))
         plt.plot(audio)
@@ -90,7 +97,10 @@ class Dataloader():
         label = data[2]
         
         if self.verbose :
-            print(f"Item of index {i} (from cache)")
+            if i < self.n_original_clips:
+                print(f"Item of index {i} (from original cache)")
+            else:
+                print(f"Item of index {i} (from augmentation cache)")
             print(f"Loaded from: {file_path}")
             print(f"Fold: {fold}")
             print(f"Label: {label}")
@@ -119,6 +129,40 @@ class Dataloader():
                 print(f"Class Label: {clip.class_label}")
                 print(f"Salience: {clip.salience}")
                 print("="*30)
+
+        elif self.include_augmented and i >= self.n_original_clips:
+            aug_index = i - self.n_original_clips
+            meta = self.augmentation_metadata[aug_index]
+            
+            file_path = config.PROJECT_ROOT / meta['path']
+            loaded_data = np.load(file_path, allow_pickle=True)
+            
+            # Check if it's the object array structure [audio, sr, label]
+            if loaded_data.dtype == 'O' and loaded_data.shape == (3,):
+                audio = loaded_data[0]
+                sample_rate = int(loaded_data[1])
+                label = int(loaded_data[2])
+            else:
+                audio = loaded_data
+                sample_rate = 22050 # Assumption
+                
+                filename = meta['filename']
+                # Extract label from filename (format: prefix_fsID-classID-occurrenceID-sliceID.npy)
+                try:
+                    label = int(filename.replace('.npy', '').split('-')[1])
+                except IndexError:
+                    print(f"Error parsing label from {filename}")
+                    label = -1
+            
+            filename = meta['filename']
+            fold = meta['fold']
+            
+            if self.verbose:
+                print(f"Item of index {i} (augmented)")
+                print(f"Filename: {filename}")
+                print(f"Fold: {fold}")
+                print(f"Label: {label}")
+                print("="*30)
         
         if self.preprocessing is not None:
             treated_audio = self.preprocessing.process_clip(audio, sample_rate)
@@ -128,13 +172,15 @@ class Dataloader():
 
 
 if __name__ == "__main__":
-    dl = Dataloader(dataset_path=r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets",
-                    verbose=True, include_augmented=True, preprocessing=AudioPreprocessor())
+    dl = Dataloader(dataset_path=r"C:\deep-learning-urban-sound-data\datasets",
+                    verbose=True, include_augmented=True, use_cache=True,
+                    preprocessing=AudioPreprocessor())
+    
     l = len(dl)
     print(f"Length of dataloader: {l}\n")
     
-    # Example: get an augmented item
-    aug_item, fold, label = dl[dl.n_original_clips + 35]
+    for i in range(l):
+        aug_item, fold, label = dl[i]
     
     """
     aug_item shape:

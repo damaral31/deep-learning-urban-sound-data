@@ -12,13 +12,14 @@ from preprocessing import AudioPreprocessor
 def process_augmented_clip(args):
     """Process a single augmented clip and return metadata entry"""
     i, dl, CACHE_DIR, existing_filenames = args
+    dl : Dataloader
     try:
         # Get processed data
         features, fold, label = dl[i]
         
         # Get metadata for this augmented clip
         aug_index = i - dl.n_original_clips
-        aug_metadata = dl.augmented_metadata[aug_index]
+        aug_metadata = dl.augmentation_metadata[aug_index]
         original_filename = aug_metadata['filename'] # e.g., "shift_135776-2-0-49.npy"
         
         # The filename already starts with the augmentation used (e.g. shift_, bandpass_)
