@@ -17,7 +17,7 @@ class Dataloader():
                  folds : list[str] = None, verbose : bool = False):
         
         self.n_augmented_clips = 0
-        self.dataset_path : Path = Path(dataset_path) / "urbansound8K"
+        self.dataset_path : Path = Path(dataset_path) / "urbansound8k"
         self.preprocessing = preprocessing
         self.verbose = verbose
         self.include_augmented = include_augmented
@@ -91,7 +91,10 @@ class Dataloader():
         label = data[2]
         
         if self.verbose :
-            print(f"Item of index {i} (from cache)")
+            if i < self.n_original_clips:
+                print(f"Item of index {i} (from original cache)")
+            else:
+                print(f"Item of index {i} (from augmentation cache)")
             print(f"Loaded from: {file_path}")
             print(f"Fold: {fold}")
             print(f"Label: {label}")
@@ -129,13 +132,15 @@ class Dataloader():
 
 
 if __name__ == "__main__":
-    dl = Dataloader(dataset_path=r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets",
-                    verbose=True, include_augmented=True, preprocessing=AudioPreprocessor())
+    dl = Dataloader(dataset_path=r"E:\deep-learning-urban-sound-data\datasets",
+                    verbose=True, include_augmented=True, use_cache=True,
+                    preprocessing=AudioPreprocessor())
+    
     l = len(dl)
     print(f"Length of dataloader: {l}\n")
     
-    # Example: get an augmented item
-    aug_item, fold, label = dl[dl.n_original_clips + 35]
+    for i in range(l):
+        aug_item, fold, label = dl[i]
     
     """
     aug_item shape:
