@@ -38,14 +38,20 @@ class Dataloader():
             cache_metadata_path = self.original_cache_path / "cached_files_index.json"
             self.augmentation_cache_path = config.PROJECT_ROOT / "datasets" / "augmentation_cache"
             augmentation_cache_metadata_path = self.augmentation_cache_path / "augmentation_cached_files_index.json"
+            
             self.cache_metadata = json.load(open(cache_metadata_path))
+            self.cache_metadata = [m for m in self.cache_metadata if f"fold{m['fold']}" in self.folds]
+            self.n_original_clips = len(self.cache_metadata)
+            
             self.augmentation_cache  = json.load(open(augmentation_cache_metadata_path))
+            self.augmentation_cache = [m for m in self.augmentation_cache if f"fold{m['fold']}" in self.folds]
             self.n_augmented_clips = len(self.augmentation_cache)
         else:
             if self.include_augmented:
                 self.n_augmentation_path = config.PROJECT_ROOT / "datasets" / "augmentation"
                 augmentation_metadata_path = self.n_augmentation_path / "augmented_files_index.json"
                 self.augmentation_metadata = json.load(open(augmentation_metadata_path))
+                self.augmentation_metadata = [m for m in self.augmentation_metadata if f"fold{m['fold']}" in self.folds]
                 self.n_augmented_clips = len(self.augmentation_metadata)
         if self.verbose: print(f"Dataset loaded with {len(self)} clips (folds: {self.folds})\n")
     
@@ -174,13 +180,15 @@ class Dataloader():
 if __name__ == "__main__":
     dl = Dataloader(dataset_path=r"C:\deep-learning-urban-sound-data\datasets",
                     verbose=True, include_augmented=True, use_cache=True,
-                    preprocessing=AudioPreprocessor())
+                    preprocessing=AudioPreprocessor(), folds=['fold1'])
     
     l = len(dl)
-    print(f"Length of dataloader: {l}\n")
+    print(f"Length of dataloader:\n"
+          f"Original clips: {dl.n_original_clips}\n"
+          f"Augmented clips: {dl.n_augmented_clips}\n")
     
-    for i in range(l):
-        aug_item, fold, label = dl[i]
+    #for i in range(l):
+    #    aug_item, fold, label = dl[i]
     
     """
     aug_item shape:
@@ -191,5 +199,5 @@ if __name__ == "__main__":
     4: percussive
     """
     
-    str_label = dl.get_label_mapping()[label]
-    dl.preprocessing.plot_all_channels(aug_item, fold, str_label)
+    #str_label = dl.get_label_mapping()[label]
+    #dl.preprocessing.plot_all_channels(aug_item, fold, str_label)
