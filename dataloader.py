@@ -16,6 +16,7 @@ class Dataloader():
                  include_augmented : bool = False, use_cache : bool = False,
                  folds : list[str] = None, verbose : bool = False):
         
+        self.n_augmented_clips = 0
         self.dataset_path : Path = Path(dataset_path) / "urbansound8K"
         self.preprocessing = preprocessing
         self.verbose = verbose

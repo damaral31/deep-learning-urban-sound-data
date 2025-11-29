@@ -3,6 +3,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class SEBlock(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SEBlock, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
+
+
 class SoundTransformer(nn.Module):
     """
     Transformer para classificação de sons urbanos.
@@ -22,7 +40,7 @@ class SoundTransformer(nn.Module):
     """
     
     def __init__(self, n_mels=40, n_frames=174, num_classes=10, d_model=128, 
-                 nhead=4, num_layers=2, dim_feedforward=256, dropout=0.1, in_channels=1):
+                 nhead=4, num_layers=2, dim_feedforward=256, dropout=0.1, in_channels=1, SqueezeExcitation=False):
         """
         Inicializa o Transformer para áudio.
         
@@ -50,6 +68,9 @@ class SoundTransformer(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.bn_conv1 = nn.BatchNorm2d(32)
         self.pool_conv = nn.MaxPool2d(kernel_size=(2, 1))
+        self.SqueezeExcitation = SqueezeExcitation
+        if SqueezeExcitation:
+            self.se = SEBlock(32)
         
         # Após pooling: altura reduz para n_mels // 2
         self.n_mels_pooled = n_mels // 2
@@ -125,14 +146,17 @@ class SoundTransformer(nn.Module):
         """
         batch_size = x.size(0)
         
-        # ========== PASSO 1: CONVOLUÇÃO + BATCH NORM + ReLU ==========
+        # ========== PASSO 1: CONVOLUÇÃO + BATCH NORM + ReLU ========== 
         # Extrai features 2D do espectrograma
         x = self.conv1(x)           # [batch, 32, n_mels, n_frames]
         x = self.bn_conv1(x)
         x = F.relu(x)
         
-        # ========== PASSO 2: MAX POOLING (altura) ==========
+        # ========== PASSO 2: MAX POOLING (altura) ========== 
         x = self.pool_conv(x)       # [batch, 32, n_mels//2, n_frames]
+        # ========== PASSO 2.5: Squeeze-and-Excitation ========== 
+        if self.SqueezeExcitation:
+            x = self.se(x)
         
         # ========== PASSO 3: RESHAPE EM SEQUÊNCIA ==========
         # Converte de [batch, 32, n_mels//2, n_frames]
