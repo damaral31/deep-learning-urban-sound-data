@@ -66,6 +66,7 @@ class SoundCNN(nn.Module):
         self.fc2 = nn.Linear(64, num_classes)
 
     def forward(self, x):
+        x = x.float()
         x = self.pool(F.leaky_relu(self.bn1(self.conv1(x)), negative_slope=0.1))
         x = self.pool(F.leaky_relu(self.bn2(self.conv2(x)), negative_slope=0.1))
         x = self.pool(F.leaky_relu(self.bn3(self.conv3(x)), negative_slope=0.1))

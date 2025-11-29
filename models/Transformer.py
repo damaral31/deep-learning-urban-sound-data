@@ -144,6 +144,7 @@ class SoundTransformer(nn.Module):
         Returns:
             torch.Tensor: Output com shape [batch, num_classes]
         """
+        x = x.float()
         batch_size = x.size(0)
         
         # ========== PASSO 1: CONVOLUÇÃO + BATCH NORM + ReLU ========== 
