@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
     # --- B. Initialize Data Pipeline ---
     # UPDATE THIS PATH to your actual datasets folder
-    MY_DATASET_PATH = r"C:\Users\migue\Documents\MyCode\AC2\deep-learning-urban-sound-data\datasets"
+    MY_DATASET_PATH = r"C:\deep-learning-urban-sound-data\datasets"
     
     try:
         prep = AudioPreprocessor()
