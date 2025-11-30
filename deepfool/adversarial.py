@@ -92,19 +92,26 @@ def deepfool(model, image, num_classes=10, overshoot=0.02, max_iter=50):
 
 # --- 2. Testing & Visualization Helpers ---
 
-def analyze_perturbation(perturbation_tensor):
-    """Calculates which of the 5 channels received the most noise."""
+def analyze_perturbation(perturbation_tensor, num_channels=1):
+    """Calculates perturbation energy for singlechannel or multichannel models."""
     noise_numpy = perturbation_tensor.squeeze(0).cpu().detach().numpy()
-    # Sum of squared error per channel
-    channel_energy = np.sqrt(np.sum(noise_numpy**2, axis=(1, 2)))
-    channels = ['Log Mel', 'Delta', 'Delta-Delta', 'Harmonic', 'Percussive']
     
-    print("   [Noise Analysis] Energy per channel:")
-    for i, name in enumerate(channels):
-        print(f"     - {name}: {channel_energy[i]:.4f}")
-    
-    max_idx = np.argmax(channel_energy)
-    return channels[max_idx]
+    if num_channels == 1:
+        # For singlechannel: just calculate total energy
+        total_energy = np.sqrt(np.sum(noise_numpy**2))
+        print(f"   [Noise Analysis] Total perturbation energy: {total_energy:.4f}")
+        return "Log Mel Spectrogram"
+    else:
+        # For multichannel: analyze per channel
+        channel_energy = np.sqrt(np.sum(noise_numpy**2, axis=(1, 2)))
+        channels = ['Log Mel', 'Delta', 'Delta-Delta', 'Harmonic', 'Percussive']
+        
+        print("   [Noise Analysis] Energy per channel:")
+        for i, name in enumerate(channels[:num_channels]):
+            print(f"     - {name}: {channel_energy[i]:.4f}")
+        
+        max_idx = np.argmax(channel_energy)
+        return channels[max_idx]
 
 # --- 3. Main Execution Block ---
 if __name__ == "__main__":
@@ -116,29 +123,18 @@ if __name__ == "__main__":
         print("Error: Could not import Dataloader or Preprocessing. Make sure files are in the same folder.")
         exit()
 
-    # --- A. Setup a Dummy Model for Testing ---
-    # (In your real project, load your trained .pth file here instead)
-    class SimpleTestCNN(nn.Module):
-        def __init__(self):
-            super().__init__()
-            # Input: 5 channels, Output: 10 classes
-            self.conv1 = nn.Conv2d(5, 32, kernel_size=3, padding=1)
-            self.bn1 = nn.BatchNorm2d(32)
-            self.pool = nn.AdaptiveAvgPool2d((1, 1)) # Forces output to (Batch, 32, 1, 1)
-            self.fc = nn.Linear(32, 10)
-
-        def forward(self, x):
-            x = torch.relu(self.bn1(self.conv1(x)))
-            x = self.pool(x)
-            x = x.flatten(1)
-            return self.fc(x)
-
     # Initialize device and model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Running on: {device}")
     
-    model = SimpleTestCNN().to(device)
+    # Load the trained singlechannel CNN model
+    from models.CNN import SoundCNN
+    model = SoundCNN(num_classes=10, SqueezeExcitation=False, in_channels=1)
+    model_path = r"C:\deep-learning-urban-sound-data\models_for_adversarial\CNN_singlechannel_all_folds.pth"
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.to(device)
     model.eval() # CRITICAL: DeepFool fails if model is in train mode (Dropout/BatchNorm)
+    print(f"Model loaded from: {model_path}")
 
     # --- B. Initialize Data Pipeline ---
     # UPDATE THIS PATH to your actual datasets folder
@@ -163,8 +159,9 @@ if __name__ == "__main__":
         features, fold, label_idx = dl[idx]
         original_label = dl.get_label_mapping()[label_idx]
         
-        # 2. Prepare Tensor (Add Batch Dim: 5,64,T -> 1,5,64,T)
-        input_tensor = torch.from_numpy(features).unsqueeze(0).float().to(device)
+        # 2. Prepare Tensor (Add Batch Dim and select first channel for singlechannel model)
+        # features shape: (5, 64, T) -> select first channel -> (1, 64, T) -> add batch dim -> (1, 1, 64, T)
+        input_tensor = torch.from_numpy(features[0:1]).unsqueeze(0).float().to(device)
         
         # 3. Run DeepFool
         print(f"Original Label: {original_label}")
@@ -181,26 +178,42 @@ if __name__ == "__main__":
             
             print(f"SUCCESS! Model fooled: {original_label} -> {new_label}")
             
-            # Analyze which channel took the most damage
-            worst_channel = analyze_perturbation(noise)
-            print(f"   Most attacked channel: {worst_channel}")
+            # Analyze perturbation
+            worst_channel = analyze_perturbation(noise, num_channels=1)
+            print(f"   Channel used: {worst_channel}")
             
             # 4. Visualizations
             print("Displaying plots...")
             
-            # Convert tensors back to numpy for your plotting function
+            # Convert tensors back to numpy for plotting
+            # For singlechannel: shape is (1, 1, 64, T) -> extract to (1, 64, T) for plotting
             adv_numpy = adv_img.squeeze(0).cpu().detach().numpy()
             noise_numpy = noise.squeeze(0).cpu().detach().numpy()
             
-            # Plot 1: The Original (Reference)
-            # dl.preprocessing.plot_all_channels(features, fold, f"Original: {original_label}")
+            # Create single-channel plot using matplotlib
+            fig, axes = plt.subplots(3, 1, figsize=(10, 12))
             
-            # Plot 2: The Adversarial (Result)
-            dl.preprocessing.plot_all_channels(adv_numpy, fold, f"Adversarial: {new_label}")
+            # Plot 1: Original
+            import librosa.display
+            librosa.display.specshow(features[0], x_axis='time', y_axis='mel', 
+                                    sr=prep.sample_rate, ax=axes[0])
+            axes[0].set_title(f"Original: {original_label}")
+            fig.colorbar(axes[0].images[0], ax=axes[0], format='%+2.0f dB')
             
-            # Plot 3: The Noise (What DeepFool added)
-            # We multiply by 100 because the noise is usually invisible to the eye
-            dl.preprocessing.plot_all_channels(noise_numpy * 100, fold, f"Pure Noise (x100) - Target: {new_label}")
+            # Plot 2: Adversarial
+            librosa.display.specshow(adv_numpy[0], x_axis='time', y_axis='mel', 
+                                    sr=prep.sample_rate, ax=axes[1])
+            axes[1].set_title(f"Adversarial: {new_label}")
+            fig.colorbar(axes[1].images[0], ax=axes[1], format='%+2.0f dB')
+            
+            # Plot 3: Noise (magnified)
+            librosa.display.specshow(noise_numpy[0] * 100, x_axis='time', y_axis='mel', 
+                                    sr=prep.sample_rate, ax=axes[2])
+            axes[2].set_title(f"Pure Noise (x100) - Target: {new_label}")
+            fig.colorbar(axes[2].images[0], ax=axes[2], format='%+2.0f dB')
+            
+            plt.tight_layout()
+            plt.show()
             
         else:
             print("Failed to fool the model (Example might be too robust or max_iter too low).")
