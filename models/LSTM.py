@@ -50,6 +50,7 @@ class SoundLSTM(nn.Module):
         self.num_classes = num_classes
 
     def forward(self, x):
+        x=x.float()
         batch_size = x.size(0)
         x = self.conv1(x)
         x = self.bn_conv1(x)

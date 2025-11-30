@@ -178,8 +178,8 @@ class Train:
                 val_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.val_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
                 train_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=self.train_folds, include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=True)
             else:  # augmentation_preprocessing or augmentation_singlechannel
-                test_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.test_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
-                val_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.val_fold], include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                test_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.test_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
+                val_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=[self.val_fold], include_augmented=False, use_cache=True), batch_size=self.batch_size, shuffle=False)
                 train_loader = DataLoader(MyLoader(dataset_path=self.dataset_root_path, folds=self.train_folds, include_augmented=True, use_cache=True), batch_size=self.batch_size, shuffle=True)
 
             for epoch in range(1, self.epochs+1):
